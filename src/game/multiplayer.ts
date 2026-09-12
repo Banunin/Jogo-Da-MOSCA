@@ -57,6 +57,9 @@ type PendingAction =
   | { type: "create-room"; roomName: string; password: string; playerName: string; mapId: MapId }
   | { type: "join-room"; roomName: string; password: string; playerName: string };
 
+const PUBLIC_BACKEND_KEY = "musca-multiplayer-url";
+const DEFAULT_PUBLIC_BACKEND = (import.meta.env.VITE_MUSCA_MULTIPLAYER_URL as string | undefined)?.trim() || "";
+
 class MultiplayerClient {
   private ws: WebSocket | null = null;
   private poseClock = 0;
@@ -64,11 +67,15 @@ class MultiplayerClient {
   private name = "Jogador";
   private pendingAction: PendingAction | null = null;
 
-  private targetUrl(url?: string): string {
+  private targetUrl(url?: string): string | null {
     if (url) return url;
     const query = new URLSearchParams(location.search);
-    const override = query.get("ws") || localStorage.getItem("musca-ws-url");
+    const override = query.get("ws") || localStorage.getItem(PUBLIC_BACKEND_KEY) || localStorage.getItem("musca-ws-url");
     if (override) return override;
+
+    const onGitHubPages = location.hostname.endsWith("github.io");
+    if (onGitHubPages) return DEFAULT_PUBLIC_BACKEND || null;
+
     const protocol = location.protocol === "https:" ? "wss" : "ws";
     return `${protocol}://${location.host}/ws`;
   }
@@ -78,8 +85,26 @@ class MultiplayerClient {
       if (this.ws.readyState === WebSocket.OPEN) this.flushPending();
       return;
     }
+
+    const target = this.targetUrl(url);
+    if (!target) {
+      useMultiplayerStore.setState({
+        status: "error",
+        error: "O multiplayer online ainda não tem um servidor público configurado para esta versão do GitHub Pages.",
+        role: null,
+        room: emptyRoom(),
+      });
+      return;
+    }
+
     useMultiplayerStore.setState({ status: "connecting", error: null, role: null, room: emptyRoom() });
-    const ws = new WebSocket(this.targetUrl(url));
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(target);
+    } catch {
+      useMultiplayerStore.setState({ status: "error", error: "Endereço do servidor multiplayer inválido." });
+      return;
+    }
     this.ws = ws;
     ws.addEventListener("open", () => useMultiplayerStore.setState({ status: "connected", error: null }));
     ws.addEventListener("close", () => {
@@ -87,7 +112,7 @@ class MultiplayerClient {
       this.ws = null;
       useMultiplayerStore.setState({ status: "offline", clientId: null, role: null, peers: [], slots: emptySlots(), room: emptyRoom() });
     });
-    ws.addEventListener("error", () => useMultiplayerStore.setState({ status: "error", error: "Não foi possível conectar ao serviço multiplayer deste site." }));
+    ws.addEventListener("error", () => useMultiplayerStore.setState({ status: "error", error: "Não foi possível conectar ao servidor multiplayer." }));
     ws.addEventListener("message", (e) => {
       let msg: any;
       try { msg = JSON.parse(String(e.data)); } catch { return; }
@@ -100,51 +125,50 @@ class MultiplayerClient {
           room: { id: msg.room?.id ?? null, name: msg.room?.name ?? null, mapId: msg.room?.mapId ?? null, hostClientId: msg.room?.hostClientId ?? null },
           slots: msg.slots ?? emptySlots(), peers: msg.peers ?? [], role: null,
         });
-      } else if (msg.type === "room-left" || msg.type === "room-closed") {
-        useMultiplayerStore.setState({
-          error: msg.type === "room-closed" ? (msg.reason || "O anfitrião encerrou a sala.") : null,
-          role: null, peers: [], slots: emptySlots(), room: emptyRoom(),
-        });
-      } else if (msg.type === "room-error") {
-        useMultiplayerStore.setState({ error: String(msg.message || "Não foi possível entrar na sala."), role: null });
       } else if (msg.type === "lobby") {
         useMultiplayerStore.setState({
+          room: { id: msg.room?.id ?? null, name: msg.room?.name ?? null, mapId: msg.room?.mapId ?? null, hostClientId: msg.room?.hostClientId ?? null },
           slots: msg.slots ?? emptySlots(), peers: msg.peers ?? [],
-          room: msg.room ? { id: msg.room.id ?? null, name: msg.room.name ?? null, mapId: msg.room.mapId ?? null, hostClientId: msg.room.hostClientId ?? null } : useMultiplayerStore.getState().room,
         });
-      } else if (msg.type === "peer-pose" && msg.peer?.clientId) {
-        const state = useMultiplayerStore.getState();
-        const peers = state.peers.some((peer) => peer.clientId === msg.peer.clientId)
-          ? state.peers.map((peer) => peer.clientId === msg.peer.clientId ? msg.peer as NetworkPeerState : peer)
-          : [...state.peers, msg.peer as NetworkPeerState];
-        useMultiplayerStore.setState({ peers });
-      } else if (msg.type === "claim-ok") useMultiplayerStore.setState({ role: msg.slotId, error: null });
-      else if (msg.type === "claim-denied") useMultiplayerStore.setState({ error: "Esse personagem acabou de ser escolhido por outro jogador." });
-      else if (msg.type === "game-event") for (const listener of this.eventListeners) listener(msg.event as NetworkGameEvent);
+      } else if (msg.type === "room-error") {
+        useMultiplayerStore.setState({ error: msg.message || "Erro na sala." });
+      } else if (msg.type === "room-closed") {
+        useMultiplayerStore.setState({ role: null, peers: [], slots: emptySlots(), room: emptyRoom(), error: msg.reason || "A sala foi encerrada." });
+      } else if (msg.type === "claim-ok") {
+        useMultiplayerStore.setState({ role: msg.slotId, error: null });
+      } else if (msg.type === "claim-denied") {
+        useMultiplayerStore.setState({ error: "Esse personagem já está sendo usado." });
+      } else if (msg.type === "peer-pose" && msg.peer) {
+        const peer = msg.peer as NetworkPeerState;
+        useMultiplayerStore.setState((state) => ({ peers: [...state.peers.filter((item) => item.clientId !== peer.clientId), peer] }));
+      } else if (msg.type === "game-event" && msg.event) {
+        for (const listener of this.eventListeners) listener(msg.event);
+      }
     });
   }
 
-  private flushPending(): void {
-    if (!this.pendingAction || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    const action = this.pendingAction;
-    this.pendingAction = null;
-    this.ws.send(JSON.stringify(action));
+  setPublicBackendUrl(url: string): void {
+    const clean = url.trim();
+    if (clean) localStorage.setItem(PUBLIC_BACKEND_KEY, clean);
+    else localStorage.removeItem(PUBLIC_BACKEND_KEY);
   }
 
   createRoom(roomName: string, password: string, playerName: string, mapId: MapId): void {
-    const cleanPlayer = playerName.trim().slice(0, 24) || "Jogador";
-    this.name = cleanPlayer;
-    this.pendingAction = { type: "create-room", roomName: roomName.trim(), password, playerName: cleanPlayer, mapId };
-    useMultiplayerStore.setState({ error: null });
+    this.pendingAction = { type: "create-room", roomName, password, playerName, mapId };
+    this.name = playerName || "Jogador";
     this.connect();
   }
 
   joinRoom(roomName: string, password: string, playerName: string): void {
-    const cleanPlayer = playerName.trim().slice(0, 24) || "Jogador";
-    this.name = cleanPlayer;
-    this.pendingAction = { type: "join-room", roomName: roomName.trim(), password, playerName: cleanPlayer };
-    useMultiplayerStore.setState({ error: null });
+    this.pendingAction = { type: "join-room", roomName, password, playerName };
+    this.name = playerName || "Jogador";
     this.connect();
+  }
+
+  private flushPending(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.pendingAction) return;
+    this.ws.send(JSON.stringify(this.pendingAction));
+    this.pendingAction = null;
   }
 
   leaveRoom(): void {
@@ -152,16 +176,9 @@ class MultiplayerClient {
     useMultiplayerStore.setState({ role: null, peers: [], slots: emptySlots(), room: emptyRoom(), error: null });
   }
 
-  disconnect(): void {
-    this.pendingAction = null;
-    this.ws?.close();
-    this.ws = null;
-  }
-
-  claim(slotId: MultiplayerSlotId, name: string): void {
+  claim(slotId: MultiplayerSlotId, name = this.name): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !useMultiplayerStore.getState().room.id) return;
-    this.name = name.trim().slice(0, 24) || "Jogador";
-    this.ws.send(JSON.stringify({ type: "claim", slotId, name: this.name }));
+    this.ws.send(JSON.stringify({ type: "claim", slotId, name }));
   }
 
   release(): void {
@@ -169,11 +186,11 @@ class MultiplayerClient {
     useMultiplayerStore.setState({ role: null });
   }
 
-  sendPose(pose: NetworkPose): void {
-    const now = performance.now();
-    if (now - this.poseClock < 55) return;
-    this.poseClock = now;
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !useMultiplayerStore.getState().role) return;
+  updatePose(dt: number, pose: NetworkPose): void {
+    this.poseClock += dt;
+    if (this.poseClock < 0.055) return;
+    this.poseClock = 0;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !useMultiplayerStore.getState().room.id) return;
     this.ws.send(JSON.stringify({ type: "pose", pose }));
   }
 
