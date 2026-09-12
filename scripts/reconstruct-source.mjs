@@ -39,7 +39,13 @@ for (const target of targets) {
     const chunks = await Promise.all(target.parts.map((name) => readFile(path.join(packDir, name), "utf8")));
     packed = Buffer.from(chunks.join(""), "base64");
   }
-  const source = gunzipSync(packed);
+  let source = gunzipSync(packed).toString("utf8");
+
+  // Compatibilidade entre a simulação empacotada e a camada P2P atual.
+  if (target.output === "src/game/simulation.ts") {
+    source = source.replaceAll("multiplayerClient.sendPose(", "multiplayerClient.updatePose(");
+  }
+
   const outputPath = path.join(root, target.output);
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, source);
@@ -48,5 +54,19 @@ for (const target of targets) {
 
 // store.ts é versionado diretamente. A política de saves da beta não pode ser
 // sobrescrita por um pacote antigo durante predev/prebuild/precheck.
-await access(path.join(root, "src/game/store.ts"));
+const storePath = path.join(root, "src/game/store.ts");
+await access(storePath);
+let storeSource = await readFile(storePath, "utf8");
+
+// Mantém as abas históricas do laboratório tipadas de forma consistente com a UI.
+const oldLabType = '  labTab: "brain" | "sensors" | "memory" | "profiles" | "settings";';
+const newLabType = '  labTab: LabTab;';
+if (!storeSource.includes("export type LabTab")) {
+  storeSource = storeSource.replace(
+    "export interface GameUIState {",
+    'export type LabTab = "brain" | "tasks" | "memory" | "sensors" | "profiles" | "upgrades" | "settings";\n\nexport interface GameUIState {'
+  );
+}
+storeSource = storeSource.replace(oldLabType, newLabType);
+await writeFile(storePath, storeSource);
 console.log("[MUSCA] fonte versionada mantida: src/game/store.ts");
