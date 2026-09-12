@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,6 @@ const packDir = path.join(root, "source-pack");
 
 const targets = [
   { output: "src/game/models.ts", parts: ["src__game__models_ts.gz.part00"], encoding: "binary" },
-  { output: "src/game/store.ts", parts: ["src__game__store_ts.gz.part00"], encoding: "binary" },
   {
     output: "src/game/simulation.ts",
     parts: ["src__game__simulation_ts.gz.part00", "src__game__simulation_ts.gz.part01", "src__game__simulation_ts.gz.part02a", "src__game__simulation_ts.gz.part02b"],
@@ -46,3 +45,8 @@ for (const target of targets) {
   await writeFile(outputPath, source);
   console.log(`[MUSCA] fonte reconstruída: ${target.output}`);
 }
+
+// store.ts é versionado diretamente. A política de saves da beta não pode ser
+// sobrescrita por um pacote antigo durante predev/prebuild/precheck.
+await access(path.join(root, "src/game/store.ts"));
+console.log("[MUSCA] fonte versionada mantida: src/game/store.ts");
