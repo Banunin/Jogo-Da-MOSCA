@@ -1,0 +1,25 @@
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.env
+.env.*
+!.env.example
+coverage/
+.tmp/
+tmp/
+public/assets/models/*.glb
+
+# Arquivos grandes reconstruídos automaticamente a partir de source-pack
+src/game/models.ts
+src/game/store.ts
+src/game/world.ts
+src/game/simulation.ts
+src/styles.css

@@ -1,0 +1,39 @@
+{
+  "name": "musca",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 8080",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 8080",
+    "dev:full": "node scripts/multiplayer-server.mjs",
+    "start": "node scripts/site-server.mjs",
+    "check": "tsc --noEmit",
+    "start:prod": "npm run build && npm start",
+    "models": "node scripts/export-models.mjs",
+    "predev": "npm run source && npm run models",
+    "prebuild": "npm run source && npm run models",
+    "source": "node scripts/reconstruct-source.mjs",
+    "precheck": "npm run source"
+  },
+  "dependencies": {
+    "lucide-react": "^0.510.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "three": "^0.186.0",
+    "zustand": "^5.0.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^5.7.0",
+    "vite": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

@@ -1,0 +1,1 @@
+O próprio usuário poder ser o host, funcionando similar à maneira do radmin VPN. Essa VPN apenas cria rede local e seus amigos conectam e podem se conectar num servidor privado, seguro, com senha e nome próprio. Essa é uma boa ideia, como se fosse um radmin incorporado
