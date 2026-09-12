@@ -41,7 +41,6 @@ for (const target of targets) {
   }
   let source = gunzipSync(packed).toString("utf8");
 
-  // Compatibilidade entre a simulação empacotada e a camada P2P atual.
   if (target.output === "src/game/simulation.ts") {
     source = source.replaceAll("multiplayerClient.sendPose(pose)", "multiplayerClient.updatePose(0.055, pose)");
   }
@@ -52,13 +51,9 @@ for (const target of targets) {
   console.log(`[MUSCA] fonte reconstruída: ${target.output}`);
 }
 
-// store.ts é versionado diretamente. A política de saves da beta não pode ser
-// sobrescrita por um pacote antigo durante predev/prebuild/precheck.
 const storePath = path.join(root, "src/game/store.ts");
 await access(storePath);
 let storeSource = await readFile(storePath, "utf8");
-
-// Mantém as abas históricas do laboratório tipadas de forma consistente com a UI.
 const oldLabType = '  labTab: "brain" | "sensors" | "memory" | "profiles" | "settings";';
 const newLabType = '  labTab: LabTab;';
 if (!storeSource.includes("export type LabTab")) {
@@ -70,3 +65,15 @@ if (!storeSource.includes("export type LabTab")) {
 storeSource = storeSource.replace(oldLabType, newLabType);
 await writeFile(storePath, storeSource);
 console.log("[MUSCA] fonte versionada mantida: src/game/store.ts");
+
+// A camada PeerJS é versionada diretamente. Normaliza duas expressões antes do
+// typecheck para manter compatibilidade com a regra do TypeScript sobre ?? + ||.
+const multiplayerPath = path.join(root, "src/game/multiplayer.ts");
+await access(multiplayerPath);
+let multiplayerSource = await readFile(multiplayerPath, "utf8");
+multiplayerSource = multiplayerSource.replaceAll(
+  "String(error?.message ?? type || error)",
+  "String(error?.message ?? (type || error))"
+);
+await writeFile(multiplayerPath, multiplayerSource);
+console.log("[MUSCA] camada multiplayer validada: src/game/multiplayer.ts");
