@@ -3,8 +3,10 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 const multiplayerPort = Number(process.env.MUSCA_WS_PORT || 8081);
+const base = process.env.VITE_BASE_PATH || "/";
 
 export default defineConfig({
+  base,
   plugins: [react()],
   resolve: {
     alias: {
