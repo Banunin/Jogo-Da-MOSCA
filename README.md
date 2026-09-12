@@ -2,9 +2,9 @@
 
 Jogo 3D de sobrevivência em escala de mosca, preparado para PC e mobile, com campanha, exploração, sobrevivência, desafios, laboratório/observação e multiplayer por salas dentro do próprio site.
 
-## Estado desta versão
+## Beta atual
 
-Esta branch contém a base da primeira beta jogável: tela inicial, Solo/Multiplayer, criação e entrada em salas com nome/senha, seleção de mapa/modo/missão, câmeras em 1ª/3ª pessoa/observação, IA de NPCs, controles PC/mobile/gamepad e servidor web com WebSocket.
+O projeto preserva a tela inicial do MUSCA e o fluxo agora é: nome do jogador → Solo ou Multiplayer. No Solo, o jogador escolhe mapa, modo e missão. No Multiplayer, cria uma sala ou entra em uma existente informando sala e senha, tudo dentro do próprio site.
 
 ## Rodar localmente
 
@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-No Windows também é possível usar `INICIAR.bat`.
+No Windows, `INICIAR.bat` é apenas uma conveniência de desenvolvimento. O multiplayer não depende de `.bat`.
 
 ## Produção
 
@@ -25,67 +25,33 @@ npm run build
 npm start
 ```
 
-O servidor usa `process.env.PORT` e serve o jogo e o multiplayer na mesma porta:
+O servidor usa `process.env.PORT` e entrega tudo pela mesma porta:
 
-- `https://seu-dominio/` — jogo
-- `wss://seu-dominio/ws` — multiplayer
-- `/health` — healthcheck
-
-Isso evita depender de `.bat` para multiplayer. O `.bat` existente é apenas conveniência de desenvolvimento local.
+- `/` — jogo;
+- `/ws` — multiplayer via WebSocket (`ws://`/`wss://` automaticamente);
+- `/health` — healthcheck.
 
 ## Multiplayer
 
-O fluxo fica dentro do jogo:
+As salas são isoladas no servidor. O criador é o anfitrião lógico da sala. A senha é derivada antes de ser mantida em memória. O servidor possui heartbeat, validações e limites básicos para uma beta pública controlada.
 
-1. informar o nome do jogador;
-2. escolher Multiplayer;
-3. criar sala ou entrar em uma sala;
-4. informar nome da sala e senha;
-5. escolher personagem e iniciar.
+## Fonte e build
 
-As salas são isoladas no servidor. O criador é o anfitrião lógico da sala. A senha é derivada no servidor antes de armazenamento em memória.
-
-## Mapas, modos e missões
-
-A arquitetura está separada em catálogos para permitir adicionar novos mapas, modos e missões sem reescrever a interface principal. A campanha original foi preservada e há missões adicionais baseadas em telemetria real do jogo.
-
-## Código-fonte empacotado
-
-Para manter o repositório leve, cinco arquivos grandes ficam em `source-pack/source-bundle.json.gz` e são reconstruídos automaticamente antes de desenvolvimento, build e checagem:
-
-- `src/game/simulation.ts`
-- `src/game/world.ts`
-- `src/game/store.ts`
-- `src/game/models.ts`
-- `src/styles.css`
-
-Os scripts `predev`, `prebuild` e `precheck` executam `npm run source` automaticamente. O bundle contém apenas código-fonte deste projeto.
+Alguns módulos grandes ficam compactados em fragmentos dentro de `source-pack/`. `scripts/reconstruct-source.mjs` os reconstrói automaticamente antes de `dev`, `build` e `check`. Não há download externo para reconstruir o código-fonte.
 
 ## Deploy
 
-O projeto inclui:
-
-- `Dockerfile` para deploy em container;
-- `render.yaml` para Render;
-- `Procfile` para plataformas compatíveis;
-- GitHub Actions em `.github/workflows/ci.yml`;
-- servidor Node de produção em `scripts/site-server.mjs`;
-- backend de salas em `scripts/room-server.mjs`;
-- PWA/metadata em `public/site.webmanifest`, `robots.txt` e favicon.
-
-GitHub Pages sozinho não é suficiente para o multiplayer, porque ele não mantém o processo Node/WebSocket. Use uma hospedagem Node/Container como Render, Railway, Fly.io ou infraestrutura equivalente.
+O repositório inclui `Dockerfile`, `render.yaml`, `Procfile`, GitHub Actions, servidor Node de produção, backend WebSocket e metadata/PWA. GitHub Pages sozinho não atende o multiplayer por não executar o servidor Node/WebSocket. Use Render, Railway, Fly.io ou host Node/Container equivalente.
 
 ## Comandos
 
 ```bash
-npm run source   # reconstrói módulos grandes
-npm run models   # gera modelos 3D procedurais
-npm run check    # TypeScript
-npm run dev      # desenvolvimento
-npm run build    # build Vite
-npm start        # servidor de produção
+npm run source
+npm run models
+npm run check
+npm run dev
+npm run build
+npm start
 ```
 
-## Beta test
-
-Consulte `docs/BETA_TESTE.md` para o roteiro de validação com testers.
+Consulte `docs/BETA_TESTE.md` para o roteiro da primeira rodada de beta com seus amigos.
