@@ -1,5 +1,8 @@
 # MUSCA — Beta Web
 
+> [!IMPORTANT]
+> **Projeto congelado / em pausa.** O desenvolvimento do MUSCA foi interrompido por tempo indeterminado. O repositório e o estado atual do jogo estão sendo preservados para que o projeto possa ser retomado no futuro, caso faça sentido. Não há desenvolvimento ativo no momento.
+
 Jogo 3D de sobrevivência em escala de mosca, preparado para PC e mobile, com campanha, exploração, sobrevivência, desafios, laboratório/observação e multiplayer por salas dentro do próprio site.
 
 ## Beta atual
