@@ -43,7 +43,7 @@ for (const target of targets) {
 
   // Compatibilidade entre a simulação empacotada e a camada P2P atual.
   if (target.output === "src/game/simulation.ts") {
-    source = source.replaceAll("multiplayerClient.sendPose(", "multiplayerClient.updatePose(");
+    source = source.replaceAll("multiplayerClient.sendPose(pose)", "multiplayerClient.updatePose(0.055, pose)");
   }
 
   const outputPath = path.join(root, target.output);
